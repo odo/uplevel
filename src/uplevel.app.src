@@ -1,0 +1,12 @@
+{application, uplevel,
+ [
+  {description, ""},
+  {vsn, "0.1.1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { uplevel_app, []}},
+  {env, []}
+ ]}.
