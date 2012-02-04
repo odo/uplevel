@@ -1,14 +1,15 @@
 -module(uplevel).
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
--define(TESTDB, "/tmp/eleveldb.open.test").
+-define(TESTDB, "/tmp/uplevel.test").
 -endif.
 
 -export([
 	handle/1, handle/2,
 	put/5,
 	get/4,
-    range/4, range/5
+    range/4, range/5,
+    next/3
 ]).
 
 -type table_handle() :: any().
@@ -29,7 +30,6 @@ handle(Path, Options) ->
 	{ok, Handle} = eleveldb:open(Path, Options),
 	Handle.
 
-% insert an element with a bucket
 -spec put(binary(), any(), any(), table_handle(), put_options()) -> ok | {error, any()}.
 put(Bucket, Key, Value, Handle, Options) ->
 	KeyEncoded =  encode_key(Key, 		 proplists:get_value(key_encoder, Options)),
@@ -51,12 +51,10 @@ get(Bucket, Key, Handle, Options) ->
 		not_found -> not_found
 	end.
 
-% get keys
 -spec range(binary(), binary(), max_key(), table_handle()) -> [binary()].
 range(Bucket, Key, Max, Handle) ->
     range(Bucket, Key, Max, Handle, []).
 
-% get keys
 -spec range(binary(), binary(), max_key(), table_handle(), keys_options()) -> [binary()].
 range(Bucket, KeyMin, Max, Handle, Options) ->
     % check if the encoding options make sense
@@ -113,6 +111,16 @@ next_key_max(Iterator, Max, Candidate, KeysValues) ->
                 _ -> KeysValues
             end;
         {error, invalid_iterator}   -> KeysValues
+    end.
+
+next(Bucket, KeyMin, Handle) ->
+    {ok, Iterator} = eleveldb:iterator(Handle, []),
+    case eleveldb:iterator_move(Iterator, prefix_key(KeyMin, Bucket)) of
+        {ok, CompositeKey, Value} ->
+            {Bucket, Key} = expand_key(CompositeKey),
+            {Key, binary_to_term(Value)};
+        {error,invalid_iterator} ->
+            not_found
     end.
 
 % get keys until the key equals a given key
@@ -180,7 +188,7 @@ store_test_() ->
 	].
 
 test_setup() ->
-	os:cmd("rm -rf /tmp/eleveldb.open.test").
+	os:cmd("rm -rf " ++ ?TESTDB).
  
 test_teardown(_) ->
 	nothing.
