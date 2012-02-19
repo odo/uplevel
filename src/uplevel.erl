@@ -6,10 +6,13 @@
 
 -export([
 	handle/1, handle/2,
-	put/5,
+    put/5,
+    put_command/3, put_command/4,
+	delete_command/2, delete_command/3,
 	get/4,
     delete/3,
     delete/4,
+    write/2, write/3,
     range/4, range/5,
     next/3,
     next_larger/3
@@ -21,6 +24,7 @@
 -type delete_options()  :: [{sync, boolean()}] | [].
 -type keys_options()  :: [{key_encoder, fun()} | {key_decoder, fun()}] | [].
 -type max_key() :: binary() | function().
+-type command() :: {put, binary(), binary()} | {delete, binary()}.
 
 -define(SEPARATOR, <<"/uplevel-separator/">>).
 -define(MINBINARY, <<0:8>>).
@@ -37,15 +41,17 @@ handle(Path, Options) ->
 
 -spec put(binary(), any(), any(), table_handle(), put_options()) -> ok | {error, any()}.
 put(Bucket, Key, Value, Handle, Options) ->
+    eleveldb:write(Handle, [put_command(Bucket, Key, Value, Options)], Options).
+
+-spec put_command(binary(), any(), any()) -> ok | {error, any()}.
+put_command(Bucket, Key, Value) ->
+    put_command(Bucket, Key, Value, []).
+
+-spec put_command(binary(), any(), any(), put_options()) -> ok | {error, any()}.
+put_command(Bucket, Key, Value, Options) ->
 	KeyEncoded =  encode_key(Key, 		 proplists:get_value(key_encoder, Options)),
 	KeyPrefixed = prefix_key(KeyEncoded, Bucket),
-    eleveldb:put(
-    	Handle,
-    	KeyPrefixed,
-    	term_to_binary(Value),
-    	proplists:get_value(put_options, Options, [])
-    ).
-
+    {put, KeyPrefixed, term_to_binary(Value)}.
 
 -spec get(binary(), any(), table_handle(), get_options()) -> 'not_found' | {binary(), binary()}.
 get(Bucket, Key, Handle, Options) ->
@@ -62,9 +68,25 @@ delete(Bucket, Key, Handle) ->
 
 -spec delete(binary(), any(), table_handle(), delete_options()) -> ok.
 delete(Bucket, Key, Handle, Options) ->
+    eleveldb:write(Handle, [delete_command(Bucket, Key, Options)], Options).
+
+-spec delete_command(binary(), any()) -> ok | {error, any()}.
+delete_command(Bucket, Key) -> 
+    delete_command(Bucket, Key, []).
+
+-spec delete_command(binary(), any(), put_options()) -> ok | {error, any()}.
+delete_command(Bucket, Key, Options) -> 
     KeyEncoded =  encode_key(Key,           proplists:get_value(key_encoder, Options)),
     KeyPrefixed = prefix_key(KeyEncoded,    Bucket),
-    eleveldb:delete(Handle, KeyPrefixed , Options).
+    {delete, KeyPrefixed}.
+
+-spec write([command()], any()) -> ok | {error, any()}.
+write(Commands, Handle) ->
+    write(Handle, Commands, []).
+
+-spec write([command()], any(), delete_options()) -> ok | {error, any()}.
+write(Commands, Handle, Options) ->
+    eleveldb:write(Handle, Commands, Options).
 
 -spec range(binary(), binary(), max_key(), table_handle()) -> [binary()].
 range(Bucket, Key, Max, Handle) ->
@@ -208,7 +230,8 @@ store_test_() ->
         {"get range", fun test_range/0},
         {"get range with encoding", fun test_range_with_encoding/0},
         {"get range with fun", fun test_range_fun/0},
-      	{"get next key", fun test_next/0}
+        {"get next key", fun test_next/0},
+      	{"use commands", fun test_commands/0}
 		]}
 	].
 
@@ -334,5 +357,16 @@ test_next() ->
     ?assertEqual(not_found, next_larger(Bucket1, <<"key3">>, Handle)),
     ?assertEqual({<<"key1">>, value1}, next_larger(Bucket2, <<"key">>, Handle)),
     ?assertEqual({<<"key1">>, value1}, next(Bucket2, <<"key">>, Handle)).
+
+test_commands() ->
+    Handle = handle(?TESTDB, [{create_if_missing, true}]),
+    PutCommand = put_command(<<"bucket">>, <<"key">>, value),
+    write([PutCommand], Handle, [{sync, true}]),
+    ?assertEqual({<<"key">>, value}, ?MODULE:get(<<"bucket">>, <<"key">>, Handle, [])),
+    DeleteCommand = delete_command(<<"bucket">>, <<"key">>),
+    write([DeleteCommand], Handle, [{sync, true}]),
+    ?assertEqual(not_found, ?MODULE:get(<<"bucket">>, <<"key">>, Handle, [])).
+
+
 
 -endif.
