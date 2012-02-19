@@ -82,7 +82,7 @@ delete_command(Bucket, Key, Options) ->
 
 -spec write([command()], any()) -> ok | {error, any()}.
 write(Commands, Handle) ->
-    write(Handle, Commands, []).
+    write(Commands, Handle, []).
 
 -spec write([command()], any(), delete_options()) -> ok | {error, any()}.
 write(Commands, Handle, Options) ->
