@@ -8,17 +8,22 @@
 	handle/1, handle/2,
 	put/5,
 	get/4,
+    delete/3,
+    delete/4,
     range/4, range/5,
-    next/3
+    next/3,
+    next_larger/3
 ]).
 
 -type table_handle() :: any().
 -type put_options()  :: [{put_options, []} | {key_encoder, fun()}] | [].
 -type get_options()  :: [{key_decoder, fun()}] | [].
+-type delete_options()  :: [{sync, boolean()}] | [].
 -type keys_options()  :: [{key_encoder, fun()} | {key_decoder, fun()}] | [].
 -type max_key() :: binary() | function().
 
 -define(SEPARATOR, <<"/uplevel-separator/">>).
+-define(MINBINARY, <<0:8>>).
 
 % creates a table and returns the table handle
 -spec handle(string()) -> table_handle().
@@ -50,6 +55,16 @@ get(Bucket, Key, Handle, Options) ->
 		{ok, Value} -> {Key, binary_to_term(Value)};
 		not_found -> not_found
 	end.
+
+-spec delete(binary(), any(), table_handle()) -> ok.
+delete(Bucket, Key, Handle) ->
+    delete(Bucket, Key, Handle, []).
+
+-spec delete(binary(), any(), table_handle(), delete_options()) -> ok.
+delete(Bucket, Key, Handle, Options) ->
+    KeyEncoded =  encode_key(Key,           proplists:get_value(key_encoder, Options)),
+    KeyPrefixed = prefix_key(KeyEncoded,    Bucket),
+    eleveldb:delete(Handle, KeyPrefixed , Options).
 
 -spec range(binary(), binary(), max_key(), table_handle()) -> [binary()].
 range(Bucket, Key, Max, Handle) ->
@@ -113,12 +128,20 @@ next_key_max(Iterator, Max, Candidate, KeysValues) ->
         {error, invalid_iterator}   -> KeysValues
     end.
 
+next_larger(Bucket, KeyMin, Handle) ->
+    next(Bucket, <<KeyMin/binary, ?MINBINARY/binary>>, Handle).
+
 next(Bucket, KeyMin, Handle) ->
     {ok, Iterator} = eleveldb:iterator(Handle, []),
     case eleveldb:iterator_move(Iterator, prefix_key(KeyMin, Bucket)) of
         {ok, CompositeKey, Value} ->
-            {Bucket, Key} = expand_key(CompositeKey),
-            {Key, binary_to_term(Value)};
+            {BucketIn, Key} = expand_key(CompositeKey),
+            case BucketIn of
+                Bucket ->
+                    {Key, binary_to_term(Value)};
+                _ ->
+                    not_found
+            end;
         {error,invalid_iterator} ->
             not_found
     end.
@@ -180,10 +203,12 @@ store_test_() ->
       [
         {"prefix and extract key", fun test_prefix_key/0},
       	{"put data", fun test_put/0},
-      	{"put data with key encoding", fun test_put_encode/0},
+        {"put data with key encoding", fun test_put_encode/0},
+      	{"put and delete data", fun test_delete/0},
         {"get range", fun test_range/0},
         {"get range with encoding", fun test_range_with_encoding/0},
-      	{"get range with fun", fun test_range_fun/0}
+        {"get range with fun", fun test_range_fun/0},
+      	{"get next key", fun test_next/0}
 		]}
 	].
 
@@ -232,6 +257,14 @@ test_put_encode() ->
     ?assertEqual(not_found, ?MODULE:get(Bucket, nonexisting_key, Handle, [{key_encoder, fun erlang:term_to_binary/1}])),
     ?assertEqual(ok, ?MODULE:put(Bucket, key, value, Handle, [{key_encoder, fun erlang:term_to_binary/1}])),
 	?assertEqual({key, value}, ?MODULE:get(Bucket, key, Handle, [{key_encoder, fun erlang:term_to_binary/1}])).
+
+test_delete() ->
+    Bucket = <<"bucket">>,
+    Handle = handle(?TESTDB, [{create_if_missing, true}]),
+    ?MODULE:put(Bucket, <<"key">>, value, Handle, [{put_options, [sync, true]}]),
+    ?assertEqual({<<"key">>, value}, ?MODULE:get(Bucket, <<"key">>, Handle, [])),    
+    delete(Bucket, <<"key">>, Handle, [{sync, true}]),
+    ?assertEqual(not_found, ?MODULE:get(Bucket, <<"key">>, Handle, [])).
 
 test_range() ->
     Bucket = <<"bucket">>,
@@ -285,5 +318,21 @@ test_range_fun() ->
     ?assertEqual([{<<"c">>, c}, {<<"d">>, d}, {<<"e">>, e}], range(Bucket, <<"c">>, fun(_) -> true end, Handle)),
     ?assertEqual([{<<"c">>, c}, {<<"d">>, d}], range(Bucket, <<"c">>, fun(Key) -> Key < <<"e">> end, Handle)),
     ?assertEqual([], range(Bucket, <<"c">>, fun(Key) -> Key < <<"a">> end, Handle)).
+
+test_next() ->
+    Bucket1 = <<"bucket1">>,
+    Bucket2 = <<"bucket2">>,
+    Handle = handle(?TESTDB, [{create_if_missing, true}]),
+    ?MODULE:put(Bucket1, <<"key1">>, value1, Handle, [{put_options, [sync, true]}]),
+    ?MODULE:put(Bucket1, <<"key2">>, value2, Handle, [{put_options, [sync, true]}]),
+    ?MODULE:put(Bucket1, <<"key3">>, value3, Handle, [{put_options, [sync, true]}]),
+    ?MODULE:put(Bucket2, <<"key1">>, value1, Handle, [{put_options, [sync, true]}]),
+    ?assertEqual({<<"key1">>, value1}, next(Bucket1, <<>>, Handle)),
+    ?assertEqual({<<"key1">>, value1}, next(Bucket1, <<"key1">>, Handle)),
+    ?assertEqual({<<"key2">>, value2}, next_larger(Bucket1, <<"key1">>, Handle)),
+    ?assertEqual({<<"key3">>, value3}, next_larger(Bucket1, <<"key2">>, Handle)),
+    ?assertEqual(not_found, next_larger(Bucket1, <<"key3">>, Handle)),
+    ?assertEqual({<<"key1">>, value1}, next_larger(Bucket2, <<"key">>, Handle)),
+    ?assertEqual({<<"key1">>, value1}, next(Bucket2, <<"key">>, Handle)).
 
 -endif.
