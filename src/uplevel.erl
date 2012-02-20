@@ -15,6 +15,7 @@
     write/2, write/3,
     range/4, range/5,
     next/3,
+    next_from_iterator/3,
     next_larger/3
 ]).
 
@@ -168,6 +169,28 @@ next(Bucket, KeyMin, Handle) ->
             not_found
     end.
 
+next_from_iterator(Bucket, KeyMin, Iterator) ->
+    case eleveldb:iterator_move(Iterator, prefix_key(KeyMin, Bucket)) of
+        {ok, CompositeKey} ->
+            {BucketIn, Key} = expand_key(CompositeKey),
+            case BucketIn of
+                Bucket ->
+                    Key;
+                _ ->
+                    not_found
+            end;
+        {ok, CompositeKey, Value} ->
+            {BucketIn, Key} = expand_key(CompositeKey),
+            case BucketIn of
+                Bucket ->
+                    {Key, binary_to_term(Value)};
+                _ ->
+                    not_found
+            end;
+        {error,invalid_iterator} ->
+            not_found
+    end.
+
 % get keys until the key equals a given key
 next_key_fun(Iterator, MaxFun, Candidate, KeysValues) ->
     case Candidate of
@@ -231,6 +254,7 @@ store_test_() ->
         {"get range with encoding", fun test_range_with_encoding/0},
         {"get range with fun", fun test_range_fun/0},
         {"get next key", fun test_next/0},
+        {"get next key wirth itarator", fun test_next_from_iterator/0},
       	{"use commands", fun test_commands/0}
 		]}
 	].
@@ -358,6 +382,15 @@ test_next() ->
     ?assertEqual({<<"key1">>, value1}, next_larger(Bucket2, <<"key">>, Handle)),
     ?assertEqual({<<"key1">>, value1}, next(Bucket2, <<"key">>, Handle)).
 
+test_next_from_iterator() ->
+    Bucket1 = <<"bucket1">>,
+    Handle = handle(?TESTDB, [{create_if_missing, true}]),
+    ?MODULE:put(Bucket1, <<"key1">>, value1, Handle, [{put_options, [sync, true]}]),
+    {ok, Iterator1} = eleveldb:iterator(Handle, [], keys_only),
+    ?assertEqual(<<"key1">>, next_from_iterator(Bucket1, <<"key">>, Iterator1)),
+    {ok, Iterator2} = eleveldb:iterator(Handle, []),
+    ?assertEqual({<<"key1">>, value1}, next_from_iterator(Bucket1, <<"key">>, Iterator2)).
+    
 test_commands() ->
     Handle = handle(?TESTDB, [{create_if_missing, true}]),
     PutCommand = put_command(<<"bucket">>, <<"key">>, value),
