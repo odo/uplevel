@@ -1,4 +1,6 @@
 -module(uplevel).
+-author('Florian Odronitz <odo@mac.com>').
+
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -define(TESTDB, "/tmp/uplevel.test").
