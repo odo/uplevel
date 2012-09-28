@@ -15,5 +15,8 @@ test:
 start:
 	erl -pz ebin deps/*/ebin
 
+xref: compile
+	rebar xref skip_deps=true
+
 analyze: compile
-	rebar analyze skip_deps=true
+	dialyzer ebin/*.beam deps/eleveldb/ebin/*.beam

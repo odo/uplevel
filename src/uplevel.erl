@@ -10,8 +10,7 @@
     put_command/3, put_command/4,
 	delete_command/2, delete_command/3,
 	get/4,
-    delete/3,
-    delete/4,
+    delete/3, delete/4,
     write/2, write/3,
     range/4, range/5,
     next/3,
@@ -44,11 +43,11 @@ handle(Path, Options) ->
 put(Bucket, Key, Value, Handle, Options) ->
     eleveldb:write(Handle, [put_command(Bucket, Key, Value, Options)], Options).
 
--spec put_command(binary(), any(), any()) -> ok | {error, any()}.
+-spec put_command(binary(), any(), any()) -> {'put', binary(), binary()}.
 put_command(Bucket, Key, Value) ->
     put_command(Bucket, Key, Value, []).
 
--spec put_command(binary(), any(), any(), put_options()) -> ok | {error, any()}.
+-spec put_command(binary(), any(), any(), put_options()) -> {'put', binary(), binary()}.
 put_command(Bucket, Key, Value, Options) ->
 	KeyEncoded =  encode_key(Key, 		 proplists:get_value(key_encoder, Options)),
 	KeyPrefixed = prefix_key(KeyEncoded, Bucket),
@@ -71,11 +70,11 @@ delete(Bucket, Key, Handle) ->
 delete(Bucket, Key, Handle, Options) ->
     eleveldb:write(Handle, [delete_command(Bucket, Key, Options)], Options).
 
--spec delete_command(binary(), any()) -> ok | {error, any()}.
+-spec delete_command(binary(), any()) -> {'delete', binary()}.
 delete_command(Bucket, Key) -> 
     delete_command(Bucket, Key, []).
 
--spec delete_command(binary(), any(), put_options()) -> ok | {error, any()}.
+-spec delete_command(binary(), any(), put_options()) -> {'delete', binary()}.
 delete_command(Bucket, Key, Options) -> 
     KeyEncoded =  encode_key(Key,           proplists:get_value(key_encoder, Options)),
     KeyPrefixed = prefix_key(KeyEncoded,    Bucket),
