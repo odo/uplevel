@@ -95,22 +95,22 @@ range(Bucket, Min, Max, Handle) when is_binary(Bucket) andalso is_binary(Min) an
         true ->
             [];
         false ->
-            next_key_max(Iterator, Max, eleveldb:iterator_move(Iterator, KeyMinComposite), [])
+            next_key_max(Iterator, Max, eleveldb:iterator_move(Iterator, KeyMinComposite))
     end,
     eleveldb:iterator_close(Iterator),
-    lists:reverse(Keys).
+    Keys.
 
 % get keys until the key equals a given key
-next_key_max(Iterator, Max, Candidate, KeysValues) ->
+next_key_max(Iterator, Max, Candidate) ->
     case Candidate of
         {ok, CompositeKeyNext, ValueNext} ->
             {_Bucket, Key} = expand_key(CompositeKeyNext),
             case Key of
                 _ when Key =< Max ->
-                    next_key_max(Iterator, Max, eleveldb:iterator_move(Iterator, next), [{Key, binary_to_term(ValueNext)} | KeysValues]);
-                _ -> KeysValues
+                    [{Key, binary_to_term(ValueNext)}|next_key_max(Iterator, Max, eleveldb:iterator_move(Iterator, next))];
+                _ -> []
             end;
-        {error, invalid_iterator}   -> KeysValues
+        {error, invalid_iterator}   -> []
     end.
 
 next_larger(Bucket, KeyMin, Handle) ->
