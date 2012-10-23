@@ -1,7 +1,7 @@
 {application, uplevel,
  [
   {description, ""},
-  {vsn, "0.1.1"},
+  {vsn, "0.2.1"},
   {registered, []},
   {applications, [
                   kernel,
