@@ -86,11 +86,11 @@ write(Commands, Handle) ->
 write(Commands, Handle, Options) ->
     eleveldb:write(Handle, Commands, Options).
 
--spec range(binary(), binary(), max_key(), table_handle()) -> [binary()].
+-spec range(binary(), binary(), max_key(), table_handle()) -> [{binary(), any()}].
 range(Bucket, Min, Max, Handle) when is_binary(Bucket) andalso is_binary(Min) andalso is_binary(Max) ->
     {ok, Iterator} = eleveldb:iterator(Handle, []),
     KeyMinComposite = prefix_key(Min, Bucket),
-    Keys =
+    KeyVals =
     case Min > Max of
         true ->
             [];
@@ -98,7 +98,7 @@ range(Bucket, Min, Max, Handle) when is_binary(Bucket) andalso is_binary(Min) an
             next_key_max(Iterator, Max, eleveldb:iterator_move(Iterator, KeyMinComposite))
     end,
     eleveldb:iterator_close(Iterator),
-    Keys.
+    KeyVals.
 
 % get keys until the key equals a given key
 next_key_max(Iterator, Max, Candidate) ->
