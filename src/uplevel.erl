@@ -40,24 +40,24 @@ handle(Path, Options) ->
 	{ok, Handle} = eleveldb:open(Path, Options),
 	Handle.
 
--spec put(binary(), any(), any(), table_handle()) -> ok | {error, any()}.
+-spec put(binary(), binary(), any(), table_handle()) -> ok | {error, any()}.
 put(Bucket, Key, Value, Handle) ->
     put(Bucket, Key, Value, Handle, []).
 
--spec put(binary(), any(), any(), table_handle(), put_options()) -> ok | {error, any()}.
+-spec put(binary(), binary(), any(), table_handle(), put_options()) -> ok | {error, any()}.
 put(Bucket, Key, Value, Handle, Options) when is_binary(Bucket) andalso is_binary(Key) ->
     eleveldb:write(Handle, [put_command(Bucket, Key, Value)], Options).
 
--spec put_command(binary(), any(), any()) -> {'put', binary(), binary()}.
+-spec put_command(binary(), binary(), any()) -> {'put', binary(), binary()}.
 put_command(Bucket, Key, Value) when is_binary(Bucket) andalso is_binary(Key) ->
 	KeyPrefixed = prefix_key(Key, Bucket),
     {put, KeyPrefixed, term_to_binary(Value)}.
 
--spec get(binary(), any(), table_handle()) -> 'not_found' | {binary(), binary()}.
+-spec get(binary(), binary(), table_handle()) -> 'not_found' | {binary(), any()}.
 get(Bucket, Key, Handle) ->
     get(Bucket, Key, Handle, []).
 
--spec get(binary(), any(), table_handle(), get_options()) -> 'not_found' | {binary(), binary()}.
+-spec get(binary(), binary(), table_handle(), get_options()) -> 'not_found' | {binary(), any()}.
 get(Bucket, Key, Handle, Options) when is_binary(Bucket) andalso is_binary(Key) ->
 	KeyPrefixed = prefix_key(Key, Bucket),
 	case eleveldb:get(Handle, KeyPrefixed, proplists:get_value(get_options, Options, [])) of
@@ -65,15 +65,15 @@ get(Bucket, Key, Handle, Options) when is_binary(Bucket) andalso is_binary(Key) 
 		not_found -> not_found
 	end.
 
--spec delete(binary(), any(), table_handle()) -> ok.
+-spec delete(binary(), binary(), table_handle()) -> ok.
 delete(Bucket, Key, Handle) ->
     delete(Bucket, Key, Handle, []).
 
--spec delete(binary(), any(), table_handle(), delete_options()) -> ok.
+-spec delete(binary(), binary(), table_handle(), delete_options()) -> ok.
 delete(Bucket, Key, Handle, Options) when is_binary(Bucket) andalso is_binary(Key) ->
     eleveldb:write(Handle, [delete_command(Bucket, Key)], Options).
 
--spec delete_command(binary(), any()) -> {'delete', binary()}.
+-spec delete_command(binary(), binary()) -> {'delete', binary()}.
 delete_command(Bucket, Key) when is_binary(Bucket) andalso is_binary(Key) -> 
     KeyPrefixed = prefix_key(Key, Bucket),
     {delete, KeyPrefixed}.
