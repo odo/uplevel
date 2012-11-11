@@ -7,17 +7,19 @@
 -endif.
 
 -export([
-	handle/1, handle/2,
-    put/5, put/4,
-    put_command/3,
-	delete_command/2,
-	get/4, get/3,
-    delete/3, delete/4,
-    write/2, write/3,
-    range/4,
-    next/3,
-    next_from_iterator/3,
-    next_larger/3
+	handle/1, handle/2
+    , put/5, put/4
+    , put_command/3
+	, delete_command/2
+	, get/4, get/3
+    , delete/3, delete/4
+    , write/2, write/3
+    , range/4
+    , next/3
+    , next_key/3
+    , next_larger/3
+    , next_larger_key/3
+    , next_from_iterator/3
 ]).
 
 -type table_handle() :: any().
@@ -116,8 +118,15 @@ next_key_max(Iterator, Max, Candidate) ->
 next_larger(Bucket, KeyMin, Handle) ->
     next(Bucket, <<KeyMin/binary, ?MINBINARY/binary>>, Handle).
 
+next_larger_key(Bucket, KeyMin, Handle) ->
+    next_key(Bucket, <<KeyMin/binary, ?MINBINARY/binary>>, Handle).
+
 next(Bucket, KeyMin, Handle) ->
     {ok, Iterator} = eleveldb:iterator(Handle, []),
+    next_from_iterator(Bucket, KeyMin, Iterator).
+
+next_key(Bucket, KeyMin, Handle) ->
+    {ok, Iterator} = eleveldb:iterator(Handle, [], keys_only),
     next_from_iterator(Bucket, KeyMin, Iterator).
 
 next_from_iterator(Bucket, KeyMin, Iterator) ->
@@ -167,6 +176,7 @@ store_test_() ->
       	{"put and delete data", fun test_delete/0},
         {"get range", fun test_range/0},
         {"get next key and value", fun test_next/0},
+        {"get next key", fun test_next_key/0},
         {"get next key with itarator", fun test_next_from_iterator/0},
       	{"use commands", fun test_commands/0}
 		]}
@@ -236,6 +246,22 @@ test_next() ->
     ?assertEqual(not_found, next_larger(Bucket1, <<"key3">>, Handle)),
     ?assertEqual({<<"key1">>, value1}, next_larger(Bucket2, <<"key">>, Handle)),
     ?assertEqual({<<"key1">>, value1}, next(Bucket2, <<"key">>, Handle)).
+
+test_next_key() ->
+    Bucket1 = <<"bucket1">>,
+    Bucket2 = <<"bucket2">>,
+    Handle = handle(?TESTDB, [{create_if_missing, true}]),
+    ?MODULE:put(Bucket1, <<"key1">>, value1, Handle),
+    ?MODULE:put(Bucket1, <<"key2">>, value2, Handle),
+    ?MODULE:put(Bucket1, <<"key3">>, value3, Handle),
+    ?MODULE:put(Bucket2, <<"key1">>, value1, Handle),
+    ?assertEqual(<<"key1">>, next_key(Bucket1, <<>>, Handle)),
+    ?assertEqual(<<"key1">>, next_key(Bucket1, <<"key1">>, Handle)),
+    ?assertEqual(<<"key2">>, next_larger_key(Bucket1, <<"key1">>, Handle)),
+    ?assertEqual(<<"key3">>, next_larger_key(Bucket1, <<"key2">>, Handle)),
+    ?assertEqual(not_found, next_larger_key(Bucket1, <<"key3">>, Handle)),
+    ?assertEqual(<<"key1">>, next_larger_key(Bucket2, <<"key">>, Handle)),
+    ?assertEqual(<<"key1">>, next_key(Bucket2, <<"key">>, Handle)).
 
 test_next_from_iterator() ->
     Bucket1 = <<"bucket1">>,
