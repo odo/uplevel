@@ -118,18 +118,7 @@ next_larger(Bucket, KeyMin, Handle) ->
 
 next(Bucket, KeyMin, Handle) ->
     {ok, Iterator} = eleveldb:iterator(Handle, []),
-    case eleveldb:iterator_move(Iterator, prefix_key(KeyMin, Bucket)) of
-        {ok, CompositeKey, Value} ->
-            {BucketIn, Key} = expand_key(CompositeKey),
-            case BucketIn of
-                Bucket ->
-                    {Key, binary_to_term(Value)};
-                _ ->
-                    not_found
-            end;
-        {error,invalid_iterator} ->
-            not_found
-    end.
+    next_from_iterator(Bucket, KeyMin, Iterator).
 
 next_from_iterator(Bucket, KeyMin, Iterator) ->
     case eleveldb:iterator_move(Iterator, prefix_key(KeyMin, Bucket)) of
@@ -177,8 +166,8 @@ store_test_() ->
         {"put data with key encoding", fun test_put_encode/0},
       	{"put and delete data", fun test_delete/0},
         {"get range", fun test_range/0},
-        {"get next key", fun test_next/0},
-        {"get next key wirth itarator", fun test_next_from_iterator/0},
+        {"get next key and value", fun test_next/0},
+        {"get next key with itarator", fun test_next_from_iterator/0},
       	{"use commands", fun test_commands/0}
 		]}
 	].
