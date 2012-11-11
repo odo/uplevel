@@ -186,8 +186,8 @@ test_put() ->
     Bucket = <<"bucket">>,
     Handle = handle(?TESTDB, [{create_if_missing, true}]),
     ?assertEqual(not_found, ?MODULE:get(Bucket, <<"nonexisting_key">>, Handle, [])),
-    ?MODULE:put(Bucket, <<"key">>, value, Handle, [{put_options, [sync, true]}]),
-    ?MODULE:put(<<"another_bucket">>, <<"another_key">>, value, Handle, [{put_options, [sync, true]}]),
+    ?MODULE:put(Bucket, <<"key">>, value, Handle),
+    ?MODULE:put(<<"another_bucket">>, <<"another_key">>, value, Handle),
     ?assertEqual(not_found, ?MODULE:get(Bucket, <<"another_key">>, Handle, [])),
     ?assertEqual({<<"key">>, value}, ?MODULE:get(Bucket, <<"key">>, Handle, [])).
 
@@ -201,7 +201,7 @@ test_put_encode() ->
 test_delete() ->
     Bucket = <<"bucket">>,
     Handle = handle(?TESTDB, [{create_if_missing, true}]),
-    ?MODULE:put(Bucket, <<"key">>, value, Handle, [{put_options, [sync, true]}]),
+    ?MODULE:put(Bucket, <<"key">>, value, Handle),
     ?assertEqual({<<"key">>, value}, ?MODULE:get(Bucket, <<"key">>, Handle, [])),    
     delete(Bucket, <<"key">>, Handle, [{sync, true}]),
     ?assertEqual(not_found, ?MODULE:get(Bucket, <<"key">>, Handle, [])).
@@ -209,8 +209,8 @@ test_delete() ->
 test_range() ->
     Bucket = <<"bucket">>,
     Handle = handle(?TESTDB, [{create_if_missing, true}]),
-    ?MODULE:put(<<"another_bucket">>, <<"aa">>, value, Handle, [{put_options, [sync, true]}]),
-    Put = fun(Key, Value) -> ?MODULE:put(Bucket, Key, Value, Handle, [{put_options, [sync, true]}]) end,
+    ?MODULE:put(<<"another_bucket">>, <<"aa">>, value, Handle),
+    Put = fun(Key, Value) -> ?MODULE:put(Bucket, Key, Value, Handle) end,
     [Put(K, V) || {K, V} <- [{<<"a">>, a}, {<<"b">>, b}, {<<"c">>, c}, {<<"d">>, d}, {<<"e">>, e}]],
     KeysEval = fun(Min, Max) -> range(Bucket, Min, Max, Handle) end,
     ?assertEqual([{<<"a">>, a}], KeysEval(<<"a">>, <<"a">>)),
@@ -225,10 +225,10 @@ test_next() ->
     Bucket1 = <<"bucket1">>,
     Bucket2 = <<"bucket2">>,
     Handle = handle(?TESTDB, [{create_if_missing, true}]),
-    ?MODULE:put(Bucket1, <<"key1">>, value1, Handle, [{put_options, [sync, true]}]),
-    ?MODULE:put(Bucket1, <<"key2">>, value2, Handle, [{put_options, [sync, true]}]),
-    ?MODULE:put(Bucket1, <<"key3">>, value3, Handle, [{put_options, [sync, true]}]),
-    ?MODULE:put(Bucket2, <<"key1">>, value1, Handle, [{put_options, [sync, true]}]),
+    ?MODULE:put(Bucket1, <<"key1">>, value1, Handle),
+    ?MODULE:put(Bucket1, <<"key2">>, value2, Handle),
+    ?MODULE:put(Bucket1, <<"key3">>, value3, Handle),
+    ?MODULE:put(Bucket2, <<"key1">>, value1, Handle),
     ?assertEqual({<<"key1">>, value1}, next(Bucket1, <<>>, Handle)),
     ?assertEqual({<<"key1">>, value1}, next(Bucket1, <<"key1">>, Handle)),
     ?assertEqual({<<"key2">>, value2}, next_larger(Bucket1, <<"key1">>, Handle)),
@@ -240,7 +240,7 @@ test_next() ->
 test_next_from_iterator() ->
     Bucket1 = <<"bucket1">>,
     Handle = handle(?TESTDB, [{create_if_missing, true}]),
-    ?MODULE:put(Bucket1, <<"key1">>, value1, Handle, [{put_options, [sync, true]}]),
+    ?MODULE:put(Bucket1, <<"key1">>, value1, Handle),
     {ok, Iterator1} = eleveldb:iterator(Handle, [], keys_only),
     ?assertEqual(<<"key1">>, next_from_iterator(Bucket1, <<"key">>, Iterator1)),
     {ok, Iterator2} = eleveldb:iterator(Handle, []),
