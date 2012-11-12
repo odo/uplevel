@@ -123,11 +123,15 @@ next_larger_key(Bucket, KeyMin, Handle) ->
 
 next(Bucket, KeyMin, Handle) ->
     {ok, Iterator} = eleveldb:iterator(Handle, []),
-    next_from_iterator(Bucket, KeyMin, Iterator).
+    Res = next_from_iterator(Bucket, KeyMin, Iterator), 
+    eleveldb:iterator_close(Iterator),
+    Res.
 
 next_key(Bucket, KeyMin, Handle) ->
     {ok, Iterator} = eleveldb:iterator(Handle, [], keys_only),
-    next_from_iterator(Bucket, KeyMin, Iterator).
+    Res = next_from_iterator(Bucket, KeyMin, Iterator), 
+    eleveldb:iterator_close(Iterator),
+    Res.
 
 next_from_iterator(Bucket, KeyMin, Iterator) ->
     case eleveldb:iterator_move(Iterator, prefix_key(KeyMin, Bucket)) of
