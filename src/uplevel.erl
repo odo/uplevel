@@ -97,19 +97,24 @@ range(Bucket, Min, Max, Handle) when is_binary(Bucket) andalso is_binary(Min) an
         true ->
             [];
         false ->
-            next_key_max(Iterator, Max, eleveldb:iterator_move(Iterator, KeyMinComposite))
+            next_key_max(Iterator, Bucket, Max, eleveldb:iterator_move(Iterator, KeyMinComposite))
     end,
     eleveldb:iterator_close(Iterator),
     KeyVals.
 
 % get keys until the key equals a given key
-next_key_max(Iterator, Max, Candidate) ->
+next_key_max(Iterator, Bucket, Max, Candidate) ->
     case Candidate of
         {ok, CompositeKeyNext, ValueNext} ->
-            {_Bucket, Key} = expand_key(CompositeKeyNext),
+            {RetrievedBucket, Key} = expand_key(CompositeKeyNext),
             case Key of
                 _ when Key =< Max ->
-                    [{Key, binary_to_term(ValueNext)}|next_key_max(Iterator, Max, eleveldb:iterator_move(Iterator, next))];
+                    case RetrievedBucket of
+                         Bucket ->
+                              [{Key, binary_to_term(ValueNext)}|next_key_max(Iterator, Bucket, Max, eleveldb:iterator_move(Iterator, next))];
+                         _OtherBucket ->
+                              []
+                    end;
                 _ -> []
             end;
         {error, invalid_iterator}   -> []
@@ -179,6 +184,7 @@ store_test_() ->
         {"put data with key encoding", fun test_put_encode/0},
       	{"put and delete data", fun test_delete/0},
         {"get range", fun test_range/0},
+        {"get range multiple buckets", fun test_range_multiple_buckets/0},
         {"get next key and value", fun test_next/0},
         {"get next key", fun test_next_key/0},
         {"get next key with itarator", fun test_next_from_iterator/0},
@@ -234,6 +240,16 @@ test_range() ->
     ?assertEqual([], KeysEval(<<"x">>, <<"y">>)),
     ?assertEqual([], KeysEval(<<"">>, <<"">>)),
     ?assertEqual([], KeysEval(<<"a">>, <<"">>)).
+
+test_range_multiple_buckets() ->
+    Handle = handle(?TESTDB, [{create_if_missing, true}]),
+    Put = fun(Bucket, Key, Value) -> ?MODULE:put(Bucket, Key, Value, Handle) end,
+    Bucket1 = <<"level1/sub1">>,
+    Bucket2 = <<"level1/sub2">>,
+    [Put(Bucket2, K, V) || {K, V} <- [{<<"a">>, a}, {<<"b">>, b}, {<<"c">>, c}, {<<"d">>, d}, {<<"e">>, e}]],
+    KeysEval = fun(Bucket, Min, Max) -> range(Bucket, Min, Max, Handle) end,    
+    ?assertEqual([], KeysEval(Bucket1, <<"a">>, <<"a">>)),
+    ?assertEqual([{<<"a">>, a}], KeysEval(Bucket2, <<"a">>, <<"a">>)).
 
 test_next() ->
     Bucket1 = <<"bucket1">>,
