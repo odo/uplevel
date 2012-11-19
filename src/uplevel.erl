@@ -106,16 +106,11 @@ range(Bucket, Min, Max, Handle) when is_binary(Bucket) andalso is_binary(Min) an
 next_key_max(Iterator, Bucket, Max, Candidate) ->
     case Candidate of
         {ok, CompositeKeyNext, ValueNext} ->
-            {RetrievedBucket, Key} = expand_key(CompositeKeyNext),
-            case Key of
-                _ when Key =< Max ->
-                    case RetrievedBucket of
-                         Bucket ->
-                              [{Key, binary_to_term(ValueNext)}|next_key_max(Iterator, Bucket, Max, eleveldb:iterator_move(Iterator, next))];
-                         _OtherBucket ->
-                              []
-                    end;
-                _ -> []
+            case expand_key(CompositeKeyNext) of
+                {Bucket, Key} when Key =< Max->
+                    [{Key, binary_to_term(ValueNext)} | next_key_max(Iterator, Bucket, Max, eleveldb:iterator_move(Iterator, next))];
+                _ ->
+                    []
             end;
         {error, invalid_iterator}   -> []
     end.
